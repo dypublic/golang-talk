@@ -125,117 +125,61 @@ func main() {
     m["x"].name = "two" //ok
     fmt.Println(m["x"]) //prints: &{two}
 }
-
-
 /*
-Goroutines pattern
+Type Declarations and Methods
+level: intermediate
+When you create a type declaration by defining a new type from an existing (non-interface) type, you don't inherit the methods defined for that existing type.
 
-One of the most common solutions is to use a "WaitGroup" variable. 
-It will allow the main goroutine to wait until all worker goroutines are done. 
-If your app has long running workers with message processing loops you'll also need a way to signal those goroutines that it's time to exit. 
-You can send a "kill" message to each worker. 
-Another option is to close a channel all workers are receiving from. It's a simple way to signal all goroutines at once.
-*/
-
-package main
-
-import (
-"fmt"
-"sync"
-)
-
-func main() {
-	var wg sync.WaitGroup
-	done := make(chan struct{})
-	wq := make(chan interface{})
-	workerCount := 2
-
-	for i := 0; i < workerCount; i++ {
-		wg.Add(1)
-		go doit(i,wq,done,&wg)
-	}
-
-	for i := 0; i < workerCount; i++ {
-		wq <- i
-	}
-
-	close(done)
-	wg.Wait()
-	fmt.Println("all done!")
-}
-
-func doit(workerId int, wq <-chan interface{},done <-chan struct{},wg *sync.WaitGroup) {
-	fmt.Printf("[%v] is running\n",workerId)
-	defer wg.Done()
-	for {
-		select {
-		case m := <- wq:
-			fmt.Printf("[%v] m => %v\n",workerId,m)
-		case <- done:
-			fmt.Printf("[%v] is done\n",workerId)
-			return
-		}
-	}
-}
-
-/*Sending to an Closed Channel Causes a Panic
-Receiving from a closed channel is safe. 
-The ok return value in a receive statement will be set to false indicating that no data was received. 
-If you are receiving from a buffered channel you'll get the buffered data first and once it's empty the ok return value will be false.
-
-Sending data to a closed channel causes a panic. 
-It is a documented behavior, but it's not very intuitive for new Go developers who might expect the send behavior to be similar to the receive behavior.
+Fails:
 */
 package main
 
-import (
-"fmt"
-"time"
-)
+import "sync"
 
-func main() {
-	ch := make(chan int)
-	for i := 0; i < 3; i++ {
-		go func(idx int) {
-			ch <- (idx + 1) * 2
-		}(i)
-	}
+type myMutex sync.Mutex
 
-	//get the first result
-	fmt.Println(<-ch)
-	close(ch) //not ok (you still have other senders)
-	//do other work
-	time.Sleep(2 * time.Second)
+func main() {  
+    var mtx myMutex
+    mtx.Lock() //error
+    mtx.Unlock() //error  
 }
-/*Depending on your application the fix will be different.
-It might be a minor code change or it might require a change in your application design.
-Either way, you'll need to make sure your application doesn't try to send data to a closed channel.
- */
+/*
+Compile Errors:
 
+/tmp/sandbox106401185/main.go:9: mtx.Lock undefined (type myMutex has no field or method Lock) /tmp/sandbox106401185/main.go:10: mtx.Unlock undefined (type myMutex has no field or method Unlock)
+
+If you do need the methods from the original type you can define a new struct type embedding the original type as an anonymous field.
+
+Works:
+*/
 package main
 
-import (
-"fmt"
-"time"
-)
+import "sync"
 
-func main() {
-	ch := make(chan int)
-	done := make(chan struct{})
-	for i := 0; i < 3; i++ {
-		go func(idx int) {
-			select {
-			case ch <- (idx + 1) * 2: fmt.Println(idx,"sent result")
-			case <- done: fmt.Println(idx,"exiting")
-			}
-		}(i)
-	}
+type myLocker struct {  
+    sync.Mutex
+}
 
-	//get first result
-	fmt.Println("result:",<-ch)
-	close(done)
-	//do other work
-	time.Sleep(3 * time.Second)
+func main() {  
+    var lock myLocker
+    lock.Lock() //ok
+    lock.Unlock() //ok
+}
+/*
+Interface type declarations also retain their method sets.
+
+Works:
+*/
+package main
+
+import "sync"
+
+type myLocker sync.Locker
+
+func main() {  
+    var lock myLocker = new(sync.Mutex)
+    lock.Lock() //ok
+    lock.Unlock() //ok
 }
 
 /*
@@ -415,6 +359,31 @@ func main() {
 }
 
 /*
+Interface conversions and type assertions ¶
+Type switches are a form of conversion: they take an interface and, for each case in the switch, in a sense convert it to the type of that case. Here's a simplified version of how the code under fmt.Printf turns a value into a string using a type switch. If it's already a string, we want the actual string value held by the interface, while if it has a String method we want the result of calling the method.
+*/
+//1
+type Stringer interface {
+    String() string
+}
+
+var value interface{} // Value provided by caller.
+switch str := value.(type) {
+case string:
+    return str
+case Stringer:
+    return str.String()
+}
+//2
+str, ok := value.(string)
+if ok {
+    fmt.Printf("string value is: %q\n", str)
+} else {
+    fmt.Printf("value is not a string\n")
+}
+
+
+/*
 "nil" Interfaces and "nil" Interfaces Values
 
 level: advanced
@@ -520,4 +489,115 @@ func Query(conns []Conn, query string) Result {
         }(conn)
     }
     return <-ch
+}
+
+/*
+Goroutines pattern
+
+One of the most common solutions is to use a "WaitGroup" variable. 
+It will allow the main goroutine to wait until all worker goroutines are done. 
+If your app has long running workers with message processing loops you'll also need a way to signal those goroutines that it's time to exit. 
+You can send a "kill" message to each worker. 
+Another option is to close a channel all workers are receiving from. It's a simple way to signal all goroutines at once.
+*/
+
+package main
+
+import (
+"fmt"
+"sync"
+)
+
+func main() {
+	var wg sync.WaitGroup
+	done := make(chan struct{})
+	wq := make(chan interface{})
+	workerCount := 2
+
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go doit(i,wq,done,&wg)
+	}
+
+	for i := 0; i < workerCount; i++ {
+		wq <- i
+	}
+
+	close(done)
+	wg.Wait()
+	fmt.Println("all done!")
+}
+
+func doit(workerId int, wq <-chan interface{},done <-chan struct{},wg *sync.WaitGroup) {
+	fmt.Printf("[%v] is running\n",workerId)
+	defer wg.Done()
+	for {
+		select {
+		case m := <- wq:
+			fmt.Printf("[%v] m => %v\n",workerId,m)
+		case <- done:
+			fmt.Printf("[%v] is done\n",workerId)
+			return
+		}
+	}
+}
+
+/*Sending to an Closed Channel Causes a Panic
+Receiving from a closed channel is safe. 
+The ok return value in a receive statement will be set to false indicating that no data was received. 
+If you are receiving from a buffered channel you'll get the buffered data first and once it's empty the ok return value will be false.
+
+Sending data to a closed channel causes a panic. 
+It is a documented behavior, but it's not very intuitive for new Go developers who might expect the send behavior to be similar to the receive behavior.
+*/
+package main
+
+import (
+"fmt"
+"time"
+)
+
+func main() {
+	ch := make(chan int)
+	for i := 0; i < 3; i++ {
+		go func(idx int) {
+			ch <- (idx + 1) * 2
+		}(i)
+	}
+
+	//get the first result
+	fmt.Println(<-ch)
+	close(ch) //not ok (you still have other senders)
+	//do other work
+	time.Sleep(2 * time.Second)
+}
+/*Depending on your application the fix will be different.
+It might be a minor code change or it might require a change in your application design.
+Either way, you'll need to make sure your application doesn't try to send data to a closed channel.
+ */
+
+package main
+
+import (
+"fmt"
+"time"
+)
+
+func main() {
+	ch := make(chan int)
+	done := make(chan struct{})
+	for i := 0; i < 3; i++ {
+		go func(idx int) {
+			select {
+			case ch <- (idx + 1) * 2: fmt.Println(idx,"sent result")
+			case <- done: fmt.Println(idx,"exiting")
+			}
+		}(i)
+	}
+
+	//get first result
+	fmt.Println("result:",<-ch)
+	close(done)
+	//do other work
+	time.Sleep(3 * time.Second)
 }
