@@ -3,19 +3,9 @@ https://talks.golang.org/2016/applicative.slide
 
 http://colobu.com/2015/09/07/gotchas-and-common-mistakes-in-go-golang
 
-使用“nil” Slices and Maps
+go包组织风格：
+https://docs.qq.com/doc/BqI21X2yZIht1WdT2V0SQ0bz1r6deK3lCVXy2CQ7j804dj5H2IQmKC2Cjyb9235crb0IgpA219ufL33UQTFi0 
 
-在Slice和Array使用“range”语句时的出现的不希望得到的值
-2.11 "for"声明中的迭代变量和闭包
-30有活动的Goroutines下的应用退出
-32向已关闭的Channel发送会引起Panic
-34传值方法的接收者无法修改原有的值
-2.6在Slice中"隐藏"数据 //slice 小心小心，很多人掉坑
-7 Slice的数据“毁坏”
-8 陈旧的(Stale)Slices
-9 从"for switch"和"for select"代码块中跳出
-10 "for"声明中的迭代变量和闭包
-11 "nil" Interfaces和"nil" Interfaces的值
 
 Array和silce区别
 
