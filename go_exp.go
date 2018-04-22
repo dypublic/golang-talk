@@ -52,6 +52,82 @@ func main2() {
 }
 
 /*
+Updating Map Value Fields
+level: advanced
+If you have a map of struct values you can't update individual struct fields.
+
+Fails:
+*/
+package main
+
+type data struct {  
+    name string
+}
+
+func main() {  
+    m := map[string]data {"x":{"one"}}
+    m["x"].name = "two" //error
+}
+/*
+Compile Error:
+
+/tmp/sandbox380452744/main.go:9: cannot assign to m["x"].name
+
+It doesn't work because map elements are not addressable.
+
+What can be extra confusing for new Go devs is the fact that slice elements are addressable.
+*/
+package main
+
+import "fmt"
+
+type data struct {  
+    name string
+}
+
+func main() {  
+    s := []data {{"one"}}
+    s[0].name = "two" //ok
+    fmt.Println(s)    //prints: [{two}]
+}
+Note that a while ago it was possible to update map element fields in one of the Go compilers (gccgo), but that behavior was quickly fixed :-) It was also considered as a potential feature for Go 1.3. It wasn't important enough to support at that point in time, so it's still on the todo list.
+/*
+The first work around is to use a temporary variable.
+*/
+package main
+
+import "fmt"
+
+type data struct {  
+    name string
+}
+
+func main() {  
+    m := map[string]data {"x":{"one"}}
+    r := m["x"]
+    r.name = "two"
+    m["x"] = r
+    fmt.Printf("%v",m) //prints: map[x:{two}]
+}
+/*
+Another workaround is to use a map of pointers.
+*/
+package main
+
+import "fmt"
+
+type data struct {  
+    name string
+}
+
+func main() {  
+    m := map[string]*data {"x":{"one"}}
+    m["x"].name = "two" //ok
+    fmt.Println(m["x"]) //prints: &{two}
+}
+
+
+/*
 Goroutines pattern
 
 One of the most common solutions is to use a "WaitGroup" variable. 
